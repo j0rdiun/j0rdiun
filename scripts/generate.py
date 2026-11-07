@@ -11,9 +11,7 @@ import datetime as dt
 import json
 import math
 import os
-import struct
 import urllib.request
-import zlib
 from pathlib import Path
 from xml.sax.saxutils import escape
 
@@ -52,38 +50,34 @@ SWITCHER = [
     ("nodedotjs", "Node.js", "APIs and back ends"),
 ]
 
-# The pug. One sprite draws both the terminal logo and assets/avatar.png, which gets
-# uploaded by hand in GitHub Settings > Public profile. "." is transparent.
-SPRITE = [
-    "..KK........KK..",
-    ".KKKFFFFFFFFKKK.",
-    "KKKFFFFFFFFFFKKK",
-    "KKFFFFDFFDFFFFKK",
-    "KFFFFFFDDFFFFFFK",
-    ".FFFFFFFFFFFFFF.",
-    ".FFKKFFFFFFKKFF.",
-    "FFKWKKFFFFKWKKFF",
-    "FFKKKKFDDFKKKKFF",
-    "FFFKKFNNNNFKKFFF",
-    ".FFFFMNNNNMFFFF.",
-    ".FFFMMMMMMMMFFF.",
-    "..FFMMMMMMMMFF..",
-    "..FFFMMPPMMFFF..",
-    "...FFFMPPMFFF...",
-    ".....FFFFFF.....",
+# Tux, the terminal logo. "." is transparent.
+TUX = [
+    "......KKKKKK......",
+    "....KKKKKKKKKK....",
+    "...KKKKKKKKKKKK...",
+    "...KKKWWKKWWKKK...",
+    "..KKKWKWKKWKWKKK..",
+    "..KKKWWWKKWWWKKK..",
+    "..KKKKKOOOOKKKKK..",
+    "..KKKKOOOOOOKKKK..",
+    "..KKKKKKOOKKKKKK..",
+    ".KKKKWWWWWWWWKKKK.",
+    ".KKKWWWWWWWWWWKKK.",
+    "KKKKWWWWWWWWWWKKKK",
+    "KKKWWWWWWWWWWWWKKK",
+    "KKKWWWWWWWWWWWWKKK",
+    "KKKWWWWWWWWWWWWKKK",
+    ".KKKWWWWWWWWWWKKK.",
+    "..KKKWWWWWWWWKKK..",
+    "...KKKKKKKKKKKK...",
+    "..OOOO......OOOO..",
+    ".OOOOOO....OOOOOO.",
 ]
-SPRITE_COLOURS = {
-    "F": "#e6c38f",  # fawn
-    "D": "#c79b63",  # wrinkles
-    "K": "#2a211d",  # ears and eyes
-    "W": "#ffffff",  # eye shine
-    "M": "#3b2f29",  # muzzle
-    "N": "#17110e",  # nose
-    "P": "#ef8a9a",  # tongue
+TUX_COLOURS = {
+    "K": "#23272e",  # body
+    "W": "#f2f2f2",  # belly and eyes
+    "O": "#f5b324",  # beak and feet
 }
-# GitHub crops avatars to a circle, so the sprite sits centred on a larger grid.
-AVATAR_GRID, AVATAR_CELL = 22, 48
-AVATAR_BG = "#a07acd"
 
 ANSI = [
     ["#3a3a3a", "#e06c75", "#98c379", "#e5c07b", "#61afef", "#c678dd", "#56b6c2", "#dcdfe4"],
@@ -183,7 +177,7 @@ def run(col, row, text, cls, top):
 def sprite_rects(x, y, size):
     """SVG rects for each sprite row, merging runs of the same colour."""
     rows = []
-    for r, line in enumerate(SPRITE):
+    for r, line in enumerate(TUX):
         rects, c = [], 0
         while c < len(line):
             end = c
@@ -191,7 +185,7 @@ def sprite_rects(x, y, size):
                 end += 1
             if line[c] != ".":
                 rects.append(f'<rect x="{x + c * size:.1f}" y="{y + r * size:.1f}" width="{(end - c) * size}" '
-                             f'height="{size}" fill="{SPRITE_COLOURS[line[c]]}"/>')
+                             f'height="{size}" fill="{TUX_COLOURS[line[c]]}"/>')
             c = end
         rows.append("".join(rects))
     return rows
@@ -199,7 +193,7 @@ def sprite_rects(x, y, size):
 
 def neofetch(theme, live):
     t = THEMES[theme]
-    info_col = math.ceil(len(SPRITE[0]) * LINE / CH) + 4
+    info_col = math.ceil(len(TUX[0]) * LINE / CH) + 4
     title = PROMPT_USER
     info = [[(0, title.split("@")[0], "c1 b"), (len(title.split("@")[0]), "@", "fg"),
              (len(title.split("@")[0]) + 1, title.split("@")[1], "c1 b")],
@@ -211,7 +205,7 @@ def neofetch(theme, live):
     colour_rows = len(info)
     info += [[], []]
 
-    rows = max(len(SPRITE), len(info))
+    rows = max(len(TUX), len(info))
     body_lines = rows + 4  # prompt, gap, rows, gap, prompt
     longest = max(len(k) + 2 + len(live.get(k) or v) for k, v in INFO)
     width = max(CANVAS - MARGIN * 2, PAD * 2 + round((info_col + longest) * CH) + 8)
@@ -387,41 +381,12 @@ def switcher(theme):
 """
 
 
-# ---- avatar -----------------------------------------------------------------
-
-
-def avatar_png(bg=AVATAR_BG):
-    """The sprite as a flat PNG, written with the standard library only."""
-    rgb = lambda h: bytes(int(h[i:i + 2], 16) for i in (1, 3, 5))
-    colours = {key: rgb(value) for key, value in SPRITE_COLOURS.items()}
-    background = rgb(bg)
-    top = (AVATAR_GRID - len(SPRITE)) // 2
-    left = (AVATAR_GRID - len(SPRITE[0])) // 2
-    rows = []
-    for gy in range(AVATAR_GRID):
-        sprite_row = SPRITE[gy - top] if 0 <= gy - top < len(SPRITE) else ""
-        cells = [colours.get(sprite_row[gx - left], background) if 0 <= gx - left < len(sprite_row) else background
-                 for gx in range(AVATAR_GRID)]
-        scanline = b"\x00" + b"".join(c * AVATAR_CELL for c in cells)
-        rows.append(scanline * AVATAR_CELL)
-    size = AVATAR_GRID * AVATAR_CELL
-
-    def chunk(kind, data):
-        return struct.pack(">I", len(data)) + kind + data + struct.pack(">I", zlib.crc32(kind + data))
-
-    return (b"\x89PNG\r\n\x1a\n"
-            + chunk(b"IHDR", struct.pack(">IIBBBBB", size, size, 8, 2, 0, 0, 0))
-            + chunk(b"IDAT", zlib.compress(b"".join(rows), 9))
-            + chunk(b"IEND", b""))
-
-
 def main():
     live = stats()
     ASSETS.mkdir(exist_ok=True)
     for theme in THEMES:
         (ASSETS / f"neofetch-{theme}.svg").write_text(neofetch(theme, live))
         (ASSETS / f"switcher-{theme}.svg").write_text(switcher(theme))
-    (ASSETS / "avatar.png").write_bytes(avatar_png())
     print(json.dumps(live, indent=2))
 
 

@@ -2,7 +2,7 @@
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="assets/neofetch-dark.svg">
-  <img alt="A terminal running neofetch next to a pixel-art pug: Pop!_OS 24.04 with COSMIC, zsh in Ghostty, writing Rust, TypeScript and Python, currently building cosmic-ext-app-switcher." src="assets/neofetch-light.svg">
+  <img alt="A terminal running neofetch next to the Linux penguin: Pop!_OS 24.04 with COSMIC, zsh in Ghostty, writing Rust, TypeScript and Python, currently building cosmic-ext-app-switcher." src="assets/neofetch-light.svg">
 </picture>
 
 <a href="https://github.com/j0rdiun/cosmic-ext-app-switcher">
