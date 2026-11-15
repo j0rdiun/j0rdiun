@@ -9,7 +9,6 @@ below is published as-is. Run `python3 scripts/generate.py` to regenerate.
 import calendar
 import datetime as dt
 import json
-import math
 import os
 import urllib.request
 from pathlib import Path
@@ -50,34 +49,22 @@ SWITCHER = [
     ("nodedotjs", "Node.js", "APIs and back ends"),
 ]
 
-# Tux, the terminal logo. "." is transparent.
+# Tux in ASCII, the terminal logo.
 TUX = [
-    "......KKKKKK......",
-    "....KKKKKKKKKK....",
-    "...KKKKKKKKKKKK...",
-    "...KKKWWKKWWKKK...",
-    "..KKKWKWKKWKWKKK..",
-    "..KKKWWWKKWWWKKK..",
-    "..KKKKKOOOOKKKKK..",
-    "..KKKKOOOOOOKKKK..",
-    "..KKKKKKOOKKKKKK..",
-    ".KKKKWWWWWWWWKKKK.",
-    ".KKKWWWWWWWWWWKKK.",
-    "KKKKWWWWWWWWWWKKKK",
-    "KKKWWWWWWWWWWWWKKK",
-    "KKKWWWWWWWWWWWWKKK",
-    "KKKWWWWWWWWWWWWKKK",
-    ".KKKWWWWWWWWWWKKK.",
-    "..KKKWWWWWWWWKKK..",
-    "...KKKKKKKKKKKK...",
-    "..OOOO......OOOO..",
-    ".OOOOOO....OOOOOO.",
+    '         a8888b.       ',
+    '        d888888b.      ',
+    '        8P"YP"Y88      ',
+    '        8|o||o|88      ',
+    "        8'    .88      ",
+    "        8`._.' Y8.     ",
+    '       d/      `8b.    ',
+    '     d8:\'  "  `::88b   ',
+    '    8a.   :     _a88P  ',
+    '  ._/"Yaa_:   .| 88P|  ',
+    '  \\    YP"    `| 8P  `.',
+    "  /     \\.___.d|    .' ",
+    "  `--..__)8888P`._.'   ",
 ]
-TUX_COLOURS = {
-    "K": "#23272e",  # body
-    "W": "#f2f2f2",  # belly and eyes
-    "O": "#f5b324",  # beak and feet
-}
 
 ANSI = [
     ["#3a3a3a", "#e06c75", "#98c379", "#e5c07b", "#61afef", "#c678dd", "#56b6c2", "#dcdfe4"],
@@ -90,14 +77,14 @@ THEMES = {
     "dark": {
         "window": "#1b1b1b", "titlebar": "#262626", "border": "#ffffff1a",
         "fg": "#d4d4d4", "muted": "#9a9a9a", "c1": "#a07acd",
-        "path": "#98c379", "shadow": 0.45,
+        "path": "#98c379", "yellow": "#e5c07b", "shadow": 0.45,
         "panel": ("#212121", 0.92), "selected": ("#ffffff", 0.25), "panel_shadow": 0.6,
         "label": "#f0f6fc", "caption": "#9198a1",
     },
     "light": {
         "window": "#fbfbfb", "titlebar": "#ededed", "border": "#0000001f",
         "fg": "#2b2b2b", "muted": "#6b6b6b", "c1": "#8558b8",
-        "path": "#3d7a1f", "shadow": 0.14,
+        "path": "#3d7a1f", "yellow": "#c98a0a", "shadow": 0.14,
         "panel": ("#f2f2f2", 0.88), "selected": ("#000000", 0.12), "panel_shadow": 0.22,
         "label": "#1f2328", "caption": "#59636e",
     },
@@ -174,26 +161,9 @@ def run(col, row, text, cls, top):
     )
 
 
-def sprite_rects(x, y, size):
-    """SVG rects for each sprite row, merging runs of the same colour."""
-    rows = []
-    for r, line in enumerate(TUX):
-        rects, c = [], 0
-        while c < len(line):
-            end = c
-            while end < len(line) and line[end] == line[c]:
-                end += 1
-            if line[c] != ".":
-                rects.append(f'<rect x="{x + c * size:.1f}" y="{y + r * size:.1f}" width="{(end - c) * size}" '
-                             f'height="{size}" fill="{TUX_COLOURS[line[c]]}"/>')
-            c = end
-        rows.append("".join(rects))
-    return rows
-
-
 def neofetch(theme, live):
     t = THEMES[theme]
-    info_col = math.ceil(len(TUX[0]) * LINE / CH) + 4
+    info_col = len(TUX[0]) + 3
     title = PROMPT_USER
     info = [[(0, title.split("@")[0], "c1 b"), (len(title.split("@")[0]), "@", "fg"),
              (len(title.split("@")[0]) + 1, title.split("@")[1], "c1 b")],
@@ -211,7 +181,6 @@ def neofetch(theme, live):
     width = max(CANVAS - MARGIN * 2, PAD * 2 + round((info_col + longest) * CH) + 8)
     height = BAR + PAD * 2 + body_lines * LINE - (LINE - FONT)
     top = MARGIN + BAR + PAD + FONT - 2
-    logo = sprite_rects(PAD + MARGIN, top + 2 * LINE - FONT - .5, LINE)
     W, H = width + MARGIN * 2, height + MARGIN * 2
 
     prompt = f"{PROMPT_USER}:~$ "
@@ -232,8 +201,8 @@ def neofetch(theme, live):
 
     for r in range(rows):
         cells = []
-        if r < len(logo):
-            cells.append(f'<g shape-rendering="crispEdges">{logo[r]}</g>')
+        if r < len(TUX):
+            cells.append(run(0, r + 2, TUX[r], "c1", top))
         if r < len(info):
             cells += [run(info_col + c, r + 2, s, cls, top) for c, s, cls in info[r]]
         for band in range(2):
@@ -262,7 +231,7 @@ def neofetch(theme, live):
 <title id="title">{escape(PROMPT_USER)} running neofetch</title>
 <style>
 text {{ font: {FONT}px {MONO}; white-space: pre; }}
-.fg {{ fill: {t["fg"]}; }} .c1 {{ fill: {t["c1"]}; }} .path {{ fill: {t["path"]}; }} .b {{ font-weight: 700; }}
+.fg {{ fill: {t["fg"]}; }} .c1 {{ fill: {t["c1"]}; }} .path {{ fill: {t["path"]}; }} .muted {{ fill: {t["muted"]}; }} .yellow {{ fill: {t["yellow"]}; }} .b {{ font-weight: 700; }}
 .title {{ font: 600 13px {SANS}; fill: {t["muted"]}; }}
 .type {{ animation: appear .01s steps(1) backwards; }}
 .row {{ animation: fade .3s ease-out backwards; }}
